@@ -1,5 +1,7 @@
 // Dynamically set the BASE_URL based on the environment
-export const BASE_URL ='http://192.168.196.6:5001/api'
+// export const BASE_URL ='http://192.168.68.27:5001/api'
+export const BASE_URL = 'https://findyourhostelbackendk.onrender.com/api';
+
 
 // Function to register a user
 export const registerUser = async (data) => {
