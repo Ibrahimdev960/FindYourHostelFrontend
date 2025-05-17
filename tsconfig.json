@@ -1,0 +1,17 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+, "app/(hostellite)/SearchHostel.jsx", "app/screens/Login.jsx", "app/navigation/AppNavigator.jsx", "app/screens/HomePage.jsx", "app/screens/LandingPage.jsx", "app/screens/SettingScreen.jsx", "app/screens/Registration.jsx", "app/screens/ProfileScreen.jsx", "app/screens/AddHostel.jsx", "app/screens/AdminDashboard.tsx", "app/screens/Adminstatus.jsx", "app/screens/HostelDetails.jsx"  ]
+}
