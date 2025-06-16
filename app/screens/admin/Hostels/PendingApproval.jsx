@@ -18,6 +18,32 @@ const PendingApproval = () => {
     fetchPendingHostels();
   }, []);
 
+  const parseLocation = (location) => {
+    if (!location) return 'N/A';
+    
+    if (typeof location === 'string' && !location.startsWith('{')) {
+      return location;
+    }
+    
+    try {
+      const parsed = typeof location === 'string' ? JSON.parse(location) : location;
+      
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.address && parsed.address !== "Location selected") {
+          return parsed.address;
+        }
+        if (parsed.coordinates && Array.isArray(parsed.coordinates)) {
+          return `Coordinates: ${parsed.coordinates.join(', ')}`;
+        }
+        return 'Location available';
+      }
+      return 'N/A';
+    } catch (e) {
+      console.warn('Failed to parse location:', location, e);
+      return 'Invalid location data';
+    }
+  };
+
   const fetchPendingHostels = async () => {
     try {
       const response = await axios.get(`${BASE_URL}/hostels/pending`, {
@@ -116,7 +142,9 @@ const PendingApproval = () => {
           {hostels.map(hostel => (
             <DataTable.Row key={hostel._id}>
               <DataTable.Cell>{hostel.name}</DataTable.Cell>
-              <DataTable.Cell>{hostel.location}</DataTable.Cell>
+              <DataTable.Cell>
+                <Text>{parseLocation(hostel.location)}</Text>
+              </DataTable.Cell>
               <DataTable.Cell>{hostel.owner?.name || 'N/A'}</DataTable.Cell>
               <DataTable.Cell>
                 <View style={styles.actions}>
@@ -126,7 +154,7 @@ const PendingApproval = () => {
                     disabled={processingId === hostel._id}
                   >
                     {processingId === hostel._id ? (
-                      <ActivityIndicator color="white" size={14} />
+                      <ActivityIndicator color="white" size="small" />
                     ) : (
                       <Text style={styles.buttonText}>Approve</Text>
                     )}
@@ -149,7 +177,6 @@ const PendingApproval = () => {
         )}
       </ScrollView>
 
-      {/* Rejection Reason Modal */}
       <Modal
         visible={rejectModalVisible}
         animationType="slide"
@@ -215,6 +242,7 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     gap: 8,
   },
   button: {
@@ -222,6 +250,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 5,
     alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 70,
   },
   approveButton: {
     backgroundColor: '#28a745',
@@ -232,6 +262,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontSize: 12,
+    fontWeight: 'bold',
   },
   noData: {
     textAlign: 'center',

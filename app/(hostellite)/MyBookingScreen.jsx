@@ -7,16 +7,45 @@ import {
   StyleSheet,
   Image,
   TouchableOpacity,
+  Alert
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../../service/api';
+import { useNavigation } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
+
+// Location parser utility function
+const parseLocation = (location) => {
+  if (!location) return 'Location not specified';
+  
+  // If location is already a string
+  if (typeof location === 'string') {
+    try {
+      // Try to parse as JSON in case it's stringified
+      const parsed = JSON.parse(location);
+      if (parsed.address) return parsed.address;
+      if (parsed.coordinates) return `Coordinates: ${parsed.coordinates[1]}, ${parsed.coordinates[0]}`;
+      return location;
+    } catch {
+      return location;
+    }
+  }
+  
+  // If location is an object
+  if (typeof location === 'object') {
+    if (location.address) return location.address;
+    if (location.coordinates) return `Coordinates: ${location.coordinates[1]}, ${location.coordinates[0]}`;
+  }
+  
+  return 'Location not specified';
+};
 
 const MyBookingsScreen = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigation = useNavigation();
+  const token = useSelector(state => state.auth.token);
 
   const fetchBookings = async () => {
-    const token = await AsyncStorage.getItem('userToken');
     try {
       const res = await fetch(`${BASE_URL}/bookings/user-bookings`, {
         headers: {
@@ -26,17 +55,33 @@ const MyBookingsScreen = () => {
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to fetch bookings');
-      setBookings(data);
+      
+      // Process bookings to ensure location is properly formatted
+      const processedBookings = data.map(booking => ({
+        ...booking,
+        hostel: {
+          ...booking.hostel,
+          location: parseLocation(booking.hostel?.location)
+        }
+      }));
+      
+      setBookings(processedBookings);
     } catch (error) {
       console.error('Error:', error.message);
+      Alert.alert('Error', 'Failed to load bookings');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchBookings();
-  }, []);
+    if (token) {
+      fetchBookings();
+    } else {
+      Alert.alert('Error', 'Authentication required');
+      setLoading(false);
+    }
+  }, [token]);
 
   const renderBooking = ({ item }) => {
     if (!item?.hostel) {
@@ -52,8 +97,55 @@ const MyBookingsScreen = () => {
         </View>
       );
     }
-  
-    const { name, location, images } = item.hostel;
+
+    const { name, location, images, _id: hostelId } = item.hostel;
+    
+    const handleReviewPress = async () => {
+      try {
+        console.log('Making request to:', `${BASE_URL}/bookings/eligible-bookings/${hostelId}`);
+        
+        const response = await fetch(
+          `${BASE_URL}/bookings/eligible-bookings/${hostelId}`, 
+          {
+            headers: { 
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Server response:', errorText);
+          try {
+            const errorData = JSON.parse(errorText);
+            throw new Error(errorData.message || 'Failed to fetch eligible bookings');
+          } catch (e) {
+            throw new Error(errorText || `Server error: ${response.status}`);
+          }
+        }
+
+        const eligibleBookings = await response.json();
+        
+        if (eligibleBookings.length === 0) {
+          Alert.alert(
+            'No Eligible Bookings',
+            'You have no completed bookings for this hostel that can be reviewed'
+          );
+          return;
+        }
+
+        navigation.navigate('CreateReview', {
+          hostelId,
+          hostelName: name,
+          userBookings: eligibleBookings
+        });
+      } catch (error) {
+        console.error('Review error:', error);
+        Alert.alert('Error', error.message || 'Failed to check for reviews');
+      }
+    };
+
     return (
       <View style={styles.card}>
         {images?.length > 0 && (
@@ -70,11 +162,16 @@ const MyBookingsScreen = () => {
             {new Date(item.checkInDate).toLocaleDateString()} -{' '}
             {new Date(item.checkOutDate).toLocaleDateString()}
           </Text>
+          <TouchableOpacity
+            style={styles.reviewButton}
+            onPress={handleReviewPress}
+          >
+            <Text style={styles.reviewButtonText}>Write Review</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
   };
-  
 
   if (loading) {
     return <ActivityIndicator size="large" color="#6A0DAD" style={{ marginTop: 40 }} />;
@@ -88,11 +185,13 @@ const MyBookingsScreen = () => {
         keyExtractor={(item) => item._id}
         renderItem={renderBooking}
         contentContainerStyle={{ paddingBottom: 20 }}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>No bookings found</Text>
+        }
       />
     </View>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -136,6 +235,23 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 12,
     color: '#999',
+  },
+  reviewButton: {
+    backgroundColor: '#6A0DAD',
+    padding: 8,
+    borderRadius: 6,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  reviewButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 20,
+    color: '#666',
   },
 });
 

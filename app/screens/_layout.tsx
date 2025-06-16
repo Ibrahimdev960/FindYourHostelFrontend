@@ -4,6 +4,9 @@ import { createStackNavigator } from '@react-navigation/stack';
 import ManageHostels from './AddHostel';
 import HostelDetail from './HostelDetails';
 import All from '../screens/admin/AllHostel';
+import ReviewScreen from '../screens/ReviewScreen';
+
+
 
 const Stack = createStackNavigator();
 
@@ -13,8 +16,8 @@ export default function App() {
         <Stack.Screen name="ManageHostels" component={ManageHostels} />
         <Stack.Screen name="HostelDetail" component={HostelDetail} />
         <Stack.Screen name="AllHostels" component={All} />
+        <Stack.Screen name="ReviewScreen" component={ReviewScreen} />
 
-        
       </Stack.Navigator>
   );
 }

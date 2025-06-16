@@ -22,6 +22,9 @@ import HostelDetail from '../screens/HostelDetails';
 import { logout } from '../../src/redux/authSlice';
 import All from '../screens/admin/AllHostel';
 import AllUsers from '../screens/admin/AllUsers';
+import ReviewScreen from '../screens/ReviewScreen';
+import CreateReviewScreen from '../screens/CreateReviewScreen';
+
 
 
 // Admin screens
@@ -238,8 +241,17 @@ const AppNavigator = () => {
               ),
             })}
           />
-                  <Stack.Screen name="AllHostels" component={All} />
-                  <Stack.Screen name="AllUsers" component={AllUsers} />
+              <Stack.Screen name="AllHostels" component={All} />
+              <Stack.Screen name="AllUsers" component={AllUsers} />
+              <Stack.Screen name="Review" component={ReviewScreen} 
+              options={{headerShown:false}}
+              />
+             <Stack.Screen
+                name="CreateReview"
+                component={CreateReviewScreen}
+                options={{ title: 'Write a Review',headerShown:false }}
+              />
+
 
 
         </>

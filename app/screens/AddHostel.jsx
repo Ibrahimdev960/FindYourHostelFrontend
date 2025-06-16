@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, FlatList, TouchableOpacity,
   Alert, StyleSheet, Modal, ScrollView, Image, ActivityIndicator, RefreshControl
 } from 'react-native';
+import MapView, { Marker, Callout } from 'react-native-maps';
 import { BASE_URL } from '../../service/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
@@ -22,11 +23,19 @@ const ManageHostels = () => {
   const [rooms, setRooms] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
+  const [mapRegion, setMapRegion] = useState({
+    latitude: 24.8607, // Default to Pakistan coordinates
+    longitude: 67.0011,
+    latitudeDelta: 0.0922,
+    longitudeDelta: 0.0421,
+  });
+  const [markerPosition, setMarkerPosition] = useState(null);
+  const [address, setAddress] = useState('');
   const isFocused = useIsFocused();
 
   const [hostelForm, setHostelForm] = useState({
     name: '',
-    location: '',
+    location: { coordinates: [], address: '' },
     amenities: '',
     availability: 'true',
     status: 'pending'
@@ -164,10 +173,26 @@ const ManageHostels = () => {
     setSelectedHostel(hostel);
     setHostelForm({
       name: hostel.name || '',
-      location: hostel.location || '',
+      location: hostel.location || { coordinates: [], address: '' },
       amenities: hostel.amenities.join(', ') || '',
       availability: String(hostel.availability) || 'true',
     });
+    
+    // Set map position if coordinates exist
+    if (hostel.location?.coordinates?.length === 2) {
+      setMarkerPosition({
+        latitude: hostel.location.coordinates[1],
+        longitude: hostel.location.coordinates[0]
+      });
+      setMapRegion({
+        latitude: hostel.location.coordinates[1],
+        longitude: hostel.location.coordinates[0],
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      });
+      setAddress(hostel.location.address || '');
+    }
+    
     setImages(hostel.images || []);
     setModalVisible(true);
   };
@@ -178,14 +203,45 @@ const ManageHostels = () => {
     setRoomModalVisible(true);
   };
 
+  const handleMapPress = (e) => {
+    const { latitude, longitude } = e.nativeEvent.coordinate;
+    setMarkerPosition({ latitude, longitude });
+    reverseGeocode(latitude, longitude);
+  };
+
+  const reverseGeocode = async (lat, lng) => {
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+      const data = await response.json();
+      
+      let addressText = '';
+      if (data.address) {
+        const { road, house_number, suburb, city, state, country } = data.address;
+        addressText = [
+          road,
+          house_number,
+          suburb,
+          city,
+          state,
+          country
+        ].filter(Boolean).join(', ');
+      }
+      
+      setAddress(addressText || 'Location selected');
+    } catch (error) {
+      console.error('Reverse geocoding error:', error);
+      setAddress('Location selected');
+    }
+  };
+
   const handleAddOrUpdateHostel = async () => {
     if (!token) {
       Alert.alert('Error', 'Authentication required');
       return;
     }
   
-    if (!hostelForm.name || !hostelForm.location) {
-      Alert.alert('Error', 'Please fill all required fields');
+    if (!hostelForm.name || !markerPosition) {
+      Alert.alert('Error', 'Please fill all required fields and select a location on the map');
       return;
     }
   
@@ -204,7 +260,11 @@ const ManageHostels = () => {
   
       const formData = new FormData();
       formData.append('name', hostelForm.name);
-      formData.append('location', hostelForm.location);
+      formData.append('location', JSON.stringify({
+        type: 'Point',
+        coordinates: [markerPosition.longitude, markerPosition.latitude],
+        address: address
+      }));
       formData.append('amenities', hostelForm.amenities);
       formData.append('availability', hostelForm.availability);
       formData.append('status', hostelForm.status);
@@ -360,12 +420,14 @@ const ManageHostels = () => {
   const resetHostelForm = () => {
     setHostelForm({
       name: '',
-      location: '',
+      location: { coordinates: [], address: '' },
       amenities: '',
       availability: 'true',
       status: 'pending'
     });
     setImages([]);
+    setMarkerPosition(null);
+    setAddress('');
     setSelectedHostel(null);
   };
 
@@ -418,7 +480,12 @@ const ManageHostels = () => {
       </View>
 
       <Text style={styles.hostelName}>{item.name}</Text>
-      <Text style={styles.hostelInfo}>Location: {item.location}</Text>
+      
+      {item.location?.address ? (
+        <Text style={styles.hostelInfo}>Location: {item.location.address}</Text>
+      ) : (
+        <Text style={styles.hostelInfo}>Location: Coordinates {item.location?.coordinates?.join(', ')}</Text>
+      )}
       
       {item.status === 'rejected' && item.rejectionReason && (
         <Text style={styles.rejectionText}>
@@ -543,15 +610,42 @@ const ManageHostels = () => {
             </View>
           )}
 
-          {['name', 'location', 'amenities'].map((field) => (
-            <TextInput
-              key={field}
-              style={styles.input}
-              placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
-              value={hostelForm[field]}
-              onChangeText={(text) => handleHostelChange(field, text)}
-            />
-          ))}
+          <TextInput
+            style={styles.input}
+            placeholder="Name"
+            value={hostelForm.name}
+            onChangeText={(text) => handleHostelChange('name', text)}
+          />
+
+          <Text style={styles.mapLabel}>Select location on map:</Text>
+          <View style={styles.mapContainer}>
+            <MapView
+              style={styles.map}
+              region={mapRegion}
+              onPress={handleMapPress}
+              showsUserLocation={true}
+              showsMyLocationButton={true}
+            >
+              {markerPosition && (
+                <Marker coordinate={markerPosition}>
+                  <Callout>
+                    <Text>{address || 'Selected location'}</Text>
+                  </Callout>
+                </Marker>
+              )}
+            </MapView>
+          </View>
+
+          <Text style={styles.addressText}>
+            {address || 'Tap on the map to select a location'}
+          </Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="Amenities (comma separated)"
+            value={hostelForm.amenities}
+            onChangeText={(text) => handleHostelChange('amenities', text)}
+          />
 
           <View style={styles.availabilityContainer}>
             <Text>Availability:</Text>
@@ -602,7 +696,7 @@ const ManageHostels = () => {
           <TouchableOpacity 
             style={styles.saveButton} 
             onPress={handleAddOrUpdateHostel}
-            disabled={loading}
+            disabled={loading || !markerPosition}
           >
             {loading ? (
               <ActivityIndicator color="#FFFFFF" />
@@ -997,7 +1091,28 @@ const styles = StyleSheet.create({
     color: '#333',
     marginTop: 15,
     marginBottom: 10,
-  }
+  },
+  mapContainer: {
+    height: 200,
+    width: '100%',
+    marginVertical: 10,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  mapLabel: {
+    fontSize: 16,
+    marginTop: 10,
+    fontWeight: '500',
+  },
+  addressText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
 });
 
 export default ManageHostels;

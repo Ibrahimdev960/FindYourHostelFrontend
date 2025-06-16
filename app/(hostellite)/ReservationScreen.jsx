@@ -186,7 +186,6 @@ const handleBookNow = async () => {
   contentContainerStyle={[styles.container, { paddingBottom: 100 }]} // ⬅️ Extra padding
   style={styles.scrollView}
 >
-
         {/* Image Gallery */}
         <View style={styles.imageGalleryContainer}>
           <Image 
@@ -374,13 +373,6 @@ const handleBookNow = async () => {
   checkInDate={state.checkInDate}
   checkOutDate={state.checkOutDate}
   seatsBooked={state.seatsBooked}
-  // onSuccess={() => {
-  //   dispatch(confirmBooking(state.currentBookingId));
-  //   navigation.navigate('BookingConfirmation', { 
-  //     bookingId: state.currentBookingId 
-  //   });
-  // }}
-  // onCancel={() => updateState({ showPayment: false })}
 />
         ) : (
           <TouchableOpacity
